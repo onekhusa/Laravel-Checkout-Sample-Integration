@@ -13,7 +13,6 @@ return [
     'api_secret' => env('ONEKHUSA_API_SECRET'),
     'organisation_id' => env('ONEKHUSA_ORG_ID'),
     'merchant_account_number' => (int) env('ONEKHUSA_MERCHANT_NUMBER'),
-    'captured_by' => env('ONEKHUSA_CAPTURED_BY'),
 
     /*
     |--------------------------------------------------------------------------
@@ -35,7 +34,6 @@ return [
         'get_access_token' => env('ONEKHUSA_TOKEN_URL', 'https://api.onekhusa.com/sandbox/v1/account/getAccessToken'),
         'checkout_initiate' => env('ONEKHUSA_CHECKOUT_URL', 'https://api.onekhusa.com/sandbox/v1/checkout/rtp/initiate'),
         'checkout_redirect' => env('ONEKHUSA_CHECKOUT_REDIRECT_URL', 'https://checkout.onekhusa.com/requestToPay/initiate'),
-        'rtp_initiate' => env('ONEKHUSA_RTP_URL', 'https://api.onekhusa.com/sandbox/v1/collections/requestToPay/initiate'),
     ],
 
 ];

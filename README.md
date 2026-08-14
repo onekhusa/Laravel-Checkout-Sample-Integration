@@ -2,10 +2,7 @@
 
 A Laravel 12 integration with the **OneKhusa Payment Gateway** (sandbox) that demonstrates the complete **Hosted Checkout** flow — and, most importantly, what happens when the **callback URL is not reachable or does not match**.
 
-The project implements two payment flows behind a clean, config-driven service layer:
-
-1. **Hosted Checkout (Request To Pay Checkout)** — redirect the customer to OneKhusa's managed payment page.
-2. **Request To Pay (Collections)** — generate a Timed Account Number (TAN) that the customer pays into from their banking app.
+The project implements a single **Hosted Checkout** flow behind a clean, config-driven service layer: the customer enters their payment details, is redirected to OneKhusa's managed payment page, completes the payment there, and is redirected back when the callback completes.
 
 Payment confirmations are delivered via OneKhusa **webhooks** (`payrequest.success`) and stored in the cache so the frontend can poll status without touching the API.
 
@@ -19,7 +16,6 @@ Payment confirmations are delivered via OneKhusa **webhooks** (`payrequest.succe
 - **Token caching** — access tokens are cached (240s) to avoid hitting the token endpoint on every request.
 - **Idempotent requests** — every call includes an `X-Idempotency-Key` header.
 - **Webhook handling** — confirms payments, always acknowledges with HTTP 200.
-- **TAN generation** — Request To Pay (collections) flow returns a timed account number with expiry.
 - **Status polling** — the frontend polls a lightweight Laravel endpoint backed by the cache.
 
 ---
@@ -32,7 +28,6 @@ onekhusa-laravel-integration/
 │   ├── Http/Controllers/
 │   │   ├── Controller.php              # Base controller
 │   │   ├── TicketController.php        # Hosted checkout: buy + status
-│   │   ├── RequestToPayController.php  # RTP/TAN collections: initiate + status
 │   │   └── WebhookController.php       # OneKhusa webhook events
 │   ├── Providers/
 │   │   └── AppServiceProvider.php      # Service container registration
@@ -50,8 +45,7 @@ onekhusa-laravel-integration/
 ├── public/
 │   └── index.php                       # Front controller
 ├── resources/views/
-│   ├── welcome.blade.php               # Hosted checkout dashboard
-│   └── rtp.blade.php                   # Request To Pay (TAN) page
+│   └── welcome.blade.php               # Hosted checkout dashboard
 ├── routes/
 │   ├── web.php                         # Web routes
 │   └── api.php                         # Integration endpoints
@@ -84,7 +78,6 @@ ONEKHUSA_API_KEY=
 ONEKHUSA_API_SECRET=
 ONEKHUSA_ORG_ID=YOUR_ORG_ID
 ONEKHUSA_MERCHANT_NUMBER=
-ONEKHUSA_CAPTURED_BY=your.email@example.com
 
 # Public callback URL (your ngrok URL in development)
 PUBLIC_CALLBACK_URL=https://your-id.ngrok-free.dev
@@ -96,7 +89,6 @@ PUBLIC_CALLBACK_URL=https://your-id.ngrok-free.dev
 | `ONEKHUSA_API_SECRET` | Your sandbox **API secret** | OneKhusa merchant portal → **API / Credentials** |
 | `ONEKHUSA_ORG_ID` | Your **organisation ID** | OneKhusa merchant portal → **Organisation / Account settings** |
 | `ONEKHUSA_MERCHANT_NUMBER` | Your **merchant account number** | OneKhusa merchant portal → **Merchant / Accounts** |
-| `ONEKHUSA_CAPTURED_BY` | Email of the operator capturing the payment (optional) | Any valid email, e.g. your portal admin email |
 | `PUBLIC_CALLBACK_URL` | Public URL OneKhusa uses for redirects + webhooks | Your ngrok URL in development |
 
 > ⚠️ Use **your own** portal values — do not copy credentials from another merchant. If a key is ever exposed, rotate it in the merchant portal.
@@ -140,21 +132,18 @@ Then restart the server: `php artisan serve --port=8080`.
 
 ### 3. Test the Hosted Checkout flow
 
-1. On the dashboard, click **PURCHASE WITH LARAVEL**.
-2. You are redirected to the **OneKhusa Hosted Checkout** page.
-3. Complete the (sandbox) payment — the page provides a **TAN** to use.
-4. You are redirected back to `/?ref=...`, the syncing overlay appears, and the **Payment Verified!** success screen shows once the webhook updates the status to `Paid`.
+1. On the dashboard, click **Generate** for a reference number, or type your own.
+2. Enter an **Amount** and a **Description**, then click **PURCHASE WITH HOSTED CHECKOUT**.
+3. You are redirected to the **OneKhusa Hosted Checkout** page.
+4. Complete the (sandbox) payment — the page provides a **TAN** to use.
+5. You are redirected back to `/?ref=...`, the syncing overlay appears, and the **Payment Verified!** success screen shows once the webhook updates the status to `Paid`.
 
 > Watch the callback arrive in the logs:
 > ```bash
 > tail -f storage/logs/laravel.log   # look for "OneKhusa webhook received" + "status updated to PAID"
 > ```
 
-### 4. Test the Request To Pay (TAN) page
-
-Open **http://localhost:8080/rtp**, enter a **reference**, **amount**, and **description**, then click **INITIATE REQUEST TO PAY**. A **TAN** is generated and the page polls the status endpoint until the payment is `Paid`.
-
-### 5. Test the callback-failure scenario (optional)
+### 4. Test the callback-failure scenario (optional)
 
 To see what happens when the callback is unreachable:
 
@@ -175,13 +164,6 @@ All integration routes are prefixed with `/api` (see `routes/api.php`).
 | ------ | -------- | ----------- |
 | `POST` | `/api/Tickets/buy/{eventId}` | Initiate hosted checkout for an event. Body: `reference`, `amount`, `description`. Returns `redirectUrl` to the hosted checkout page. |
 | `GET`  | `/api/Tickets/status/{reference}` | Poll status for a checkout reference. |
-
-### Request To Pay (Collections / TAN)
-
-| Method | Endpoint | Description |
-| ------ | -------- | ----------- |
-| `POST` | `/api/requestToPay/initiate` | Generate a TAN. Body: `reference`, `amount`, `description`, `capturedBy` (optional). Returns `timedAccountNumber` + `expiryDate`. |
-| `GET`  | `/api/requestToPay/status/{reference}` | Poll status for a TAN reference. |
 
 ### Webhooks
 
@@ -243,26 +225,6 @@ sequenceDiagram
 ```
 
 Once the request is successfully initiated, OneKhusa returns a **payment transaction ID** and your app redirects the customer to the **OneKhusa Hosted Checkout**. The customer completes the payment using a **TAN** (Timed Account Number). OneKhusa then sends a **server-to-server POST** to your **callback API URL**. Your server **must** respond with **HTTP 200 OK** — this acknowledgment confirms to OneKhusa that the payment notification was received. Only then does the checkout flow complete and the customer get redirected to the configured **success page**.
-
-### Request To Pay (TAN) Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as Laravel App
-    participant O as OneKhusa API
-    participant B as Customer's Bank
-
-    U->>A: POST /api/requestToPay/initiate
-    A->>O: POST /account/getAccessToken
-    O-->>A: accessToken
-    A->>O: POST /collections/requestToPay/initiate (Bearer)
-    O-->>A: timedAccountNumber + expiry
-    A-->>U: TAN displayed to customer
-    U->>B: Customer pays TAN via banking app
-    O-->>A: Webhook payrequest.success
-    A-->>U: Frontend polls status -> Paid
-```
 
 ---
 

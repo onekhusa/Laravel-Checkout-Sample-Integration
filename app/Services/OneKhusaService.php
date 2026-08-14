@@ -10,11 +10,9 @@ use RuntimeException;
 /**
  * Thin wrapper around the OneKhusa Payment Gateway API.
  *
- * Supports two flows:
- *  - Hosted Checkout  (/checkout/rtp/initiate) — redirect the customer to a
- *    managed checkout page.
- *  - Request To Pay   (/collections/requestToPay/initiate) — generate a Timed
- *    Account Number (TAN) the customer uses to pay via bank or MNO.
+ * Supports the Hosted Checkout flow:
+ *  - Initiate a payment (/checkout/rtp/initiate), then redirect the customer
+ *    to the managed checkout page.
  */
 class OneKhusaService
 {
@@ -84,29 +82,6 @@ class OneKhusaService
     {
         return config('onekhusa.endpoints.checkout_redirect')
             . '?ptid=' . urlencode($paymentTransactionId);
-    }
-
-    /**
-     * Request To Pay — initiate a transaction and generate a TAN.
-     *
-     * POST /collections/requestToPay/initiate
-     * The returned `timedAccountNumber` (TAN) expires after 15 minutes.
-     */
-    public function requestToPayInitiate(
-        float $amount,
-        string $reference,
-        string $description,
-        ?string $capturedBy = null
-    ): array {
-        $payload = [
-            'merchantAccountNumber' => config('onekhusa.merchant_account_number'),
-            'transactionAmount' => $amount,
-            'transactionDescription' => $description,
-            'referenceNumber' => $reference,
-            'capturedBy' => $capturedBy ?: config('onekhusa.captured_by'),
-        ];
-
-        return $this->post(config('onekhusa.endpoints.rtp_initiate'), $payload, 'request-to-pay');
     }
 
     /**

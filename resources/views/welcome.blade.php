@@ -33,7 +33,6 @@
                 ONETICKET <span class="text-slate-300 font-light italic text-xl">FINTECH</span>
             </h1>
             <div class="flex items-center gap-3 mt-4 md:mt-0">
-                <a href="/rtp" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 border border-indigo-200 px-3 py-1 rounded-full">REQUEST TO PAY (TAN)</a>
                 <div class="bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full text-xs font-bold flex items-center gap-2 border border-indigo-200">
                     <span class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span> LARAVEL BLADE
                 </div>
@@ -63,17 +62,42 @@
 
             <!-- Purchase View -->
             <div id="view-purchase" class="max-w-xl mx-auto space-y-6">
-                <div class="bg-white p-10 rounded-[3rem] border shadow-sm text-center">
-                    <i data-lucide="ticket" class="mx-auto text-indigo-600 mb-4 opacity-20 w-16 h-16"></i>
-                    <h2 class="text-2xl font-bold mb-2 text-slate-400">Laravel Showcase Entry</h2>
-                    <p class="text-5xl font-black mb-10 text-slate-800">MWK 2,500</p>
-                    
-                    <button id="buyBtn" onclick="handleBuy()" class="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black text-xl flex justify-center items-center gap-3 hover:bg-indigo-700 transition disabled:opacity-50 shadow-xl">
+                <div class="bg-white p-10 rounded-[3rem] border shadow-sm">
+                    <div class="text-center">
+                        <i data-lucide="ticket" class="mx-auto text-indigo-600 mb-4 opacity-20 w-16 h-16"></i>
+                        <h2 class="text-2xl font-bold mb-2 text-slate-400">Laravel Hosted Checkout</h2>
+                        <p class="text-sm text-slate-500 mb-6">Enter the payment details — you'll be redirected to the OneKhusa hosted checkout page to complete payment.</p>
+                    </div>
+
+                    <div class="space-y-4 text-left">
+                        <div>
+                            <label class="text-xs font-bold uppercase tracking-widest text-slate-400">Reference Number (5-25 alphanumeric)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input id="reference" type="text" maxlength="25" placeholder="e.g. 1020XDFS76GS777"
+                                       class="flex-1 px-4 py-3 rounded-2xl border border-slate-200 focus:border-indigo-400 focus:outline-none" />
+                                <button type="button" onclick="generateRef()"
+                                        class="px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-sm font-bold text-slate-600">Generate</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-bold uppercase tracking-widest text-slate-400">Amount</label>
+                            <input id="amount" type="number" step="0.01" min="0.01" placeholder="e.g. 2500.00"
+                                   class="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-indigo-400 focus:outline-none" />
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-bold uppercase tracking-widest text-slate-400">Description</label>
+                            <input id="description" type="text" placeholder="e.g. Samsung 85inch TV purchase"
+                                   class="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-indigo-400 focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <button id="buyBtn" onclick="handleBuy()" class="mt-6 w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black text-xl flex justify-center items-center gap-3 hover:bg-indigo-700 transition disabled:opacity-50 shadow-xl">
                         <i data-lucide="credit-card"></i>
-                        <span id="buyBtnText">PURCHASE WITH LARAVEL</span>
+                        <span id="buyBtnText">PURCHASE WITH HOSTED CHECKOUT</span>
                     </button>
                 </div>
-
             </div>
         </main>
 
@@ -97,24 +121,40 @@
             checkPaymentStatus(refFromUrl);
         }
 
+        function generateRef() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+            let ref = '';
+            for (let i = 0; i < 15; i++) ref += chars[Math.floor(Math.random() * chars.length)];
+            document.getElementById('reference').value = ref;
+        }
+
         /**
          * Step 1: Initiate Checkout via Laravel API
          */
         async function handleBuy() {
             const btn = document.getElementById('buyBtn');
             const btnText = document.getElementById('buyBtnText');
+            const ref = document.getElementById('reference').value.trim();
+            const amount = document.getElementById('amount').value;
+            const description = document.getElementById('description').value.trim();
+
+            if (!ref || !amount || !description) {
+                alert('Please fill in the reference number, amount and description.');
+                return;
+            }
+
             btn.disabled = true;
             btnText.innerText = "REDIRECTING...";
 
             try {
                 // Calls Route::post('/api/Tickets/buy/{eventId}')
-        
                 const response = await fetch('/api/Tickets/buy/showcase', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ reference: ref, amount: amount, description: description })
                 });
 
                 const result = await response.json();
@@ -194,7 +234,7 @@
             const btn = document.getElementById('buyBtn');
             const btnText = document.getElementById('buyBtnText');
             btn.disabled = false;
-            btnText.innerText = "PURCHASE WITH LARAVEL";
+            btnText.innerText = "PURCHASE WITH HOSTED CHECKOUT";
         }
 
         lucide.createIcons();
