@@ -32,8 +32,11 @@
             <h1 class="text-3xl font-black text-blue-700 uppercase tracking-tighter">
                 ONETICKET <span class="text-slate-300 font-light italic text-xl">FINTECH</span>
             </h1>
-            <div class="bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full text-xs font-bold mt-4 md:mt-0 flex items-center gap-2 border border-indigo-200">
-                <span class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span> LARAVEL BLADE
+            <div class="flex items-center gap-3 mt-4 md:mt-0">
+                <a href="/rtp" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 border border-indigo-200 px-3 py-1 rounded-full">REQUEST TO PAY (TAN)</a>
+                <div class="bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full text-xs font-bold flex items-center gap-2 border border-indigo-200">
+                    <span class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span> LARAVEL BLADE
+                </div>
             </div>
         </header>
 
@@ -45,6 +48,16 @@
                 <p class="mb-8 text-slate-500 text-lg">Your transaction was successful via the Laravel integration.</p>
                 <button onclick="location.href='/'" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-lg shadow-blue-200">
                     Buy Another Ticket
+                </button>
+            </div>
+
+            <!-- Failure Screen (redirected here when payment fails) -->
+            <div id="view-failure" class="hidden bg-white p-16 rounded-[3rem] border shadow-2xl text-center scale-up">
+                <i data-lucide="x-circle" class="mx-auto text-red-500 mb-6 w-24 h-24"></i>
+                <h2 class="text-4xl font-black mb-4">Payment Not Completed</h2>
+                <p id="failure-msg" class="mb-8 text-slate-500 text-lg">Your transaction was not successful. Please try again.</p>
+                <button onclick="location.href='/'" class="bg-slate-900 text-white px-12 py-4 rounded-[2rem] font-black uppercase tracking-widest hover:bg-slate-700 transition shadow-lg">
+                    Try Again
                 </button>
             </div>
 
@@ -60,6 +73,7 @@
                         <span id="buyBtnText">PURCHASE WITH LARAVEL</span>
                     </button>
                 </div>
+
             </div>
         </main>
 
@@ -72,8 +86,12 @@
         // Detection Logic for Redirect landing
         const urlParams = new URLSearchParams(window.location.search);
         const refFromUrl = urlParams.get('ref');
+        const failedFromUrl = urlParams.get('failed');
 
-        if (refFromUrl) {
+        if (failedFromUrl) {
+            // The customer was redirected back via the failureRedirectionUrl.
+            showFailure('The payment was not completed on the checkout page.');
+        } else if (refFromUrl) {
             document.getElementById('verify-overlay').classList.remove('hidden');
             lucide.createIcons();
             checkPaymentStatus(refFromUrl);
@@ -123,16 +141,36 @@
                 // Calls Route::get('/api/Tickets/status/{reference}')
                 const res = await fetch(`/api/Tickets/status/${ref}`);
                 const data = await res.json();
-                
+
                 if (data.status === "Paid") {
                     showFinalSuccess();
+                } else if (data.status === "Failed") {
+                    showFailure('This payment failed. Please try again.');
                 } else {
-                    // Poll every 3 seconds
+                    // Pending / NotFound - keep polling every 3 seconds
                     setTimeout(() => checkPaymentStatus(ref), 3000);
                 }
             } catch (e) {
                 setTimeout(() => checkPaymentStatus(ref), 5000);
             }
+        }
+
+        function showFailure(message) {
+            const icon = document.getElementById('verify-icon');
+            if (icon) {
+                icon.classList.remove('animate-spin');
+                icon.innerHTML = '<i data-lucide="x-circle" class="w-16 h-16 text-red-500"></i>';
+                document.getElementById('verify-title').innerText = "Payment Failed";
+                document.getElementById('verify-msg').innerText = message;
+                lucide.createIcons();
+                setTimeout(() => {
+                    document.getElementById('verify-overlay').classList.add('hidden');
+                }, 2500);
+            }
+            document.getElementById('failure-msg').innerText = message;
+            document.getElementById('view-purchase').classList.add('hidden');
+            document.getElementById('view-failure').classList.remove('hidden');
+            window.history.replaceState({}, document.title, "/");
         }
 
         function showFinalSuccess() {
