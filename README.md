@@ -296,16 +296,4 @@ For local development, remember that OneKhusa **cannot reach a callback running 
 - If it is **not** there → OneKhusa never reached your callback URL. Verify the ngrok URL, `.env`, and the route.
 - If it **is** there but the customer still saw a failure → confirm your `ack()` returned `HTTP 200 OK` (it does unless an exception is thrown).
 
----
 
-## 🔒 Security Notes
-
-- Never commit `.env` (it is in `.gitignore`).
-- Rotate `ONEKHUSA_API_KEY` / `ONEKHUSA_API_SECRET` if they are ever exposed.
-- In production, persist transaction status to a database instead of the cache, and add webhook signature verification if provided by OneKhusa.
-
----
-
-## 📄 License
-
-MIT — free to use, modify, and distribute.
